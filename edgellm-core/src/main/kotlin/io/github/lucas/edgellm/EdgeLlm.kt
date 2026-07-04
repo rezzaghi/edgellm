@@ -7,6 +7,7 @@ import io.github.lucas.edgellm.engine.EngineSession
 import io.github.lucas.edgellm.engine.GenerationRequest
 import io.github.lucas.edgellm.engine.ModelFile
 import io.github.lucas.edgellm.internal.DeviceProfiler
+import io.github.lucas.edgellm.internal.Downloader
 import io.github.lucas.edgellm.internal.EngineRegistry
 import io.github.lucas.edgellm.internal.FitChecker
 import java.io.File
@@ -27,6 +28,14 @@ class EdgeLlm private constructor(private val context: Context) {
 
     fun isDownloaded(model: ModelSpec): Boolean =
         modelFile(model).length() == model.sizeBytes
+
+    /**
+     * Downloads the model with resume + checksum verification. Emits progress;
+     * completes instantly if the model is already on disk. Requires the
+     * INTERNET permission.
+     */
+    fun download(model: ModelSpec): Flow<DownloadProgress> =
+        Downloader.download(model.url, modelFile(model), model.sizeBytes, model.sha256)
 
     /**
      * Loads a downloaded model and returns a session ready to generate.

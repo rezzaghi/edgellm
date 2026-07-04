@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 private val QWEN_05B = ModelSpec(
     id = "qwen2.5-0.5b-instruct-q4km",
     url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-    sha256 = null, // dev only; real specs must pin a checksum
+    sha256 = "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
     sizeBytes = 491_400_032,
 )
 
@@ -55,6 +55,7 @@ class MainActivity : Activity() {
             hint = "Prompt"
             setText("Why is the sky blue? Answer briefly.")
         }
+        val downloadBtn = Button(this).apply { text = "Download model" }
         val loadBtn = Button(this).apply { text = "Load model" }
         val genBtn = Button(this).apply { text = "Generate"; isEnabled = false }
         val stopBtn = Button(this).apply { text = "Stop"; isEnabled = false }
@@ -64,6 +65,7 @@ class MainActivity : Activity() {
         root.addView(deviceInfo)
         root.addView(status)
         root.addView(promptInput)
+        root.addView(downloadBtn)
         root.addView(loadBtn)
         root.addView(genBtn)
         root.addView(stopBtn)
@@ -76,9 +78,25 @@ class MainActivity : Activity() {
             "SoC: ${profile.socModel}, ${profile.availableRamMb}MB free — fit: ${fit.label()}"
         status.text = "Model not loaded"
 
+        downloadBtn.setOnClickListener {
+            downloadBtn.isEnabled = false
+            scope.launch {
+                runCatching {
+                    edgeLlm.download(QWEN_05B).collect { p ->
+                        status.text = "Downloading: %.1f%% (%d / %d MB)".format(
+                            p.fraction * 100, p.bytesDownloaded / MB, p.totalBytes / MB,
+                        )
+                    }
+                }
+                    .onSuccess { status.text = "Download complete (verified)" }
+                    .onFailure { status.text = "Download failed: ${it.message}" }
+                downloadBtn.isEnabled = true
+            }
+        }
+
         loadBtn.setOnClickListener {
             if (!edgeLlm.isDownloaded(QWEN_05B)) {
-                status.text = "Model missing at ${edgeLlm.modelFile(QWEN_05B)}"
+                status.text = "Model not downloaded yet — tap Download model"
                 return@setOnClickListener
             }
             status.text = "Loading…"
@@ -136,6 +154,8 @@ class MainActivity : Activity() {
         scope.cancel()
     }
 }
+
+private const val MB = 1024L * 1024L
 
 private fun Fit.label(): String = when (this) {
     is Fit.Ok -> "OK"
