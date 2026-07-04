@@ -8,6 +8,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import io.github.lucas.edgellm.ChatMessage
 import io.github.lucas.edgellm.EdgeLlm
 import io.github.lucas.edgellm.EdgeLlmSession
 import io.github.lucas.edgellm.Fit
@@ -117,9 +118,10 @@ class MainActivity : Activity() {
 
         genBtn.setOnClickListener {
             val s = session ?: return@setOnClickListener
-            // Qwen2.5 chat template, hardcoded until core reads GGUF metadata.
-            val prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n" +
-                "<|im_start|>user\n${promptInput.text}<|im_end|>\n<|im_start|>assistant\n"
+            val messages = listOf(
+                ChatMessage.system("You are a helpful assistant."),
+                ChatMessage.user(promptInput.text.toString()),
+            )
 
             output.text = ""
             genBtn.isEnabled = false
@@ -127,7 +129,7 @@ class MainActivity : Activity() {
 
             generation = scope.launch {
                 runCatching {
-                    s.generate(prompt, maxTokens = 256).collect { event ->
+                    s.chat(messages, maxTokens = 256).collect { event ->
                         when (event) {
                             is GenerationEvent.Token ->
                                 output.append(event.text)

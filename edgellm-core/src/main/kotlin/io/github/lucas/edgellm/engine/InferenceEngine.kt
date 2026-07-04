@@ -30,6 +30,12 @@ interface InferenceEngine {
 interface EngineSession {
     fun generate(request: GenerationRequest): Flow<GenerationEvent>
 
+    /**
+     * Formats [messages] with the model's own chat template (e.g. from GGUF
+     * metadata), ready to pass to [generate]. Null if the model has none.
+     */
+    suspend fun applyChatTemplate(messages: List<io.github.lucas.edgellm.ChatMessage>): String?
+
     /** Token count of [text] under this model's tokenizer. */
     suspend fun tokenCount(text: String): Int
 

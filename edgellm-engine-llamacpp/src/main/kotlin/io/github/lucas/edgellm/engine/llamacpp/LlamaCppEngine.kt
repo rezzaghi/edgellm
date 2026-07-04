@@ -77,6 +77,18 @@ private class LlamaCppSession(private val handle: Long) : EngineSession {
         }
     }.flowOn(Dispatchers.IO)
 
+    override suspend fun applyChatTemplate(
+        messages: List<io.github.lucas.edgellm.ChatMessage>,
+    ): String? = withContext(Dispatchers.IO) {
+        check(!closed.get()) { "Session is closed" }
+        LlamaBridge.nativeApplyChatTemplate(
+            handle,
+            messages.map { it.role.toByteArray() }.toTypedArray(),
+            messages.map { it.content.toByteArray() }.toTypedArray(),
+            addAssistant = true,
+        )?.toString(Charsets.UTF_8)
+    }
+
     override suspend fun tokenCount(text: String): Int = withContext(Dispatchers.IO) {
         check(!closed.get()) { "Session is closed" }
         LlamaBridge.nativeTokenCount(handle, text)

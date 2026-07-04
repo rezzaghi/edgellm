@@ -32,6 +32,18 @@ object LlamaBridge {
     /** Token count of [text] under the loaded model's tokenizer, or negative on error. */
     external fun nativeTokenCount(handle: Long, text: String): Int
 
+    /**
+     * Formats a conversation with the model's embedded chat template.
+     * Roles/contents are parallel arrays of UTF-8 bytes; returns the formatted
+     * prompt as UTF-8, or null if the model has no template.
+     */
+    external fun nativeApplyChatTemplate(
+        handle: Long,
+        roles: Array<ByteArray>,
+        contents: Array<ByteArray>,
+        addAssistant: Boolean,
+    ): ByteArray?
+
     /** Requests an in-flight generate on this handle to stop soon. Thread-safe. */
     external fun nativeStop(handle: Long)
 

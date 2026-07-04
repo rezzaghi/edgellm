@@ -146,6 +146,53 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
     return generated;
 }
 
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTemplate(
+        JNIEnv *env, jobject /*thiz*/, jlong handle, jobjectArray roles,
+        jobjectArray contents, jboolean addAssistant) {
+    auto *s = toSession(handle);
+    if (!s) return nullptr;
+
+    const char *tmpl = llama_model_chat_template(s->model, /*name=*/nullptr);
+    if (!tmpl) return nullptr;
+
+    const jsize n = env->GetArrayLength(roles);
+    std::vector<std::string> storage(2 * n); // keeps the bytes alive for the call
+    std::vector<llama_chat_message> msgs(n);
+    for (jsize i = 0; i < n; ++i) {
+        auto jrole = (jbyteArray) env->GetObjectArrayElement(roles, i);
+        auto jcontent = (jbyteArray) env->GetObjectArrayElement(contents, i);
+
+        jsize rlen = env->GetArrayLength(jrole);
+        jsize clen = env->GetArrayLength(jcontent);
+        storage[2 * i].resize(rlen);
+        storage[2 * i + 1].resize(clen);
+        env->GetByteArrayRegion(jrole, 0, rlen, (jbyte *) storage[2 * i].data());
+        env->GetByteArrayRegion(jcontent, 0, clen, (jbyte *) storage[2 * i + 1].data());
+        env->DeleteLocalRef(jrole);
+        env->DeleteLocalRef(jcontent);
+
+        msgs[i] = {storage[2 * i].c_str(), storage[2 * i + 1].c_str()};
+    }
+
+    std::vector<char> buf(4096);
+    int32_t len = llama_chat_apply_template(tmpl, msgs.data(), n, addAssistant,
+                                            buf.data(), (int32_t) buf.size());
+    if (len > (int32_t) buf.size()) { // buffer was too small; retry sized
+        buf.resize(len);
+        len = llama_chat_apply_template(tmpl, msgs.data(), n, addAssistant,
+                                        buf.data(), (int32_t) buf.size());
+    }
+    if (len < 0) {
+        LOGE("chat template application failed");
+        return nullptr;
+    }
+
+    jbyteArray out = env->NewByteArray(len);
+    env->SetByteArrayRegion(out, 0, len, (jbyte *) buf.data());
+    return out;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jtext) {

@@ -12,6 +12,8 @@ import io.github.lucas.edgellm.internal.EngineRegistry
 import io.github.lucas.edgellm.internal.FitChecker
 import java.io.File
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 /** Entry point of the SDK. Obtain via [EdgeLlm.create]. */
 class EdgeLlm private constructor(private val context: Context) {
@@ -71,6 +73,21 @@ class EdgeLlmSession internal constructor(private val engine: EngineSession) {
         temperature: Float = 0.7f,
     ): Flow<GenerationEvent> =
         engine.generate(GenerationRequest(prompt, maxTokens, temperature))
+
+    /**
+     * Generates a reply to a conversation, formatting it with the model's own
+     * chat template. Fails if the model ships none — fall back to [generate]
+     * with a manually formatted prompt in that case.
+     */
+    fun chat(
+        messages: List<ChatMessage>,
+        maxTokens: Int = 512,
+        temperature: Float = 0.7f,
+    ): Flow<GenerationEvent> = flow {
+        val prompt = engine.applyChatTemplate(messages)
+            ?: error("Model has no embedded chat template; use generate() instead")
+        emitAll(engine.generate(GenerationRequest(prompt, maxTokens, temperature)))
+    }
 
     suspend fun tokenCount(text: String): Int = engine.tokenCount(text)
 
