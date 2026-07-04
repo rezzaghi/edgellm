@@ -25,5 +25,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":edgellm-engine-llamacpp"))
+    implementation(project(":edgellm-core"))
+    runtimeOnly(project(":edgellm-engine-llamacpp"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }

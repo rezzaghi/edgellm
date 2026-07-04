@@ -25,8 +25,12 @@ object LlamaBridge {
         handle: Long,
         prompt: String,
         maxTokens: Int,
+        temperature: Float,
         callback: TokenCallback,
     ): Int
+
+    /** Token count of [text] under the loaded model's tokenizer, or negative on error. */
+    external fun nativeTokenCount(handle: Long, text: String): Int
 
     /** Requests an in-flight generate on this handle to stop soon. Thread-safe. */
     external fun nativeStop(handle: Long)

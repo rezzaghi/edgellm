@@ -36,3 +36,7 @@ android {
         jvmTarget = "11"
     }
 }
+
+dependencies {
+    implementation(project(":edgellm-core"))
+}

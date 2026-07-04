@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <string>
 #include <thread>
 #include <vector>
@@ -72,7 +73,7 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
 extern "C" JNIEXPORT jint JNICALL
 Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jprompt,
-        jint maxTokens, jobject callback) {
+        jint maxTokens, jfloat temperature, jobject callback) {
     auto *s = toSession(handle);
     if (!s) return -1;
     s->stop = false;
@@ -110,8 +111,12 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
     }
 
     llama_sampler *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(smpl, llama_sampler_init_temp(0.7f));
-    llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    if (temperature > 0.0f) {
+        llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature));
+        llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    } else {
+        llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+    }
 
     int generated = 0;
     char piece[256];
@@ -139,6 +144,18 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
 
     llama_sampler_free(smpl);
     return generated;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
+        JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jtext) {
+    auto *s = toSession(handle);
+    if (!s) return -1;
+    const char *text = env->GetStringUTFChars(jtext, nullptr);
+    const int n = -llama_tokenize(s->vocab, text, (int) strlen(text),
+                                  nullptr, 0, true, true);
+    env->ReleaseStringUTFChars(jtext, text);
+    return n;
 }
 
 extern "C" JNIEXPORT void JNICALL

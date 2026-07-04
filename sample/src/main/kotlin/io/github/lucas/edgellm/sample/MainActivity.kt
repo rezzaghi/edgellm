@@ -8,28 +8,49 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import io.github.lucas.edgellm.engine.llamacpp.LlamaBridge
-import java.io.ByteArrayOutputStream
-import java.io.File
-import kotlin.concurrent.thread
+import io.github.lucas.edgellm.EdgeLlm
+import io.github.lucas.edgellm.EdgeLlmSession
+import io.github.lucas.edgellm.Fit
+import io.github.lucas.edgellm.GenerationEvent
+import io.github.lucas.edgellm.ModelSpec
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+
+private val QWEN_05B = ModelSpec(
+    id = "qwen2.5-0.5b-instruct-q4km",
+    url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+    sha256 = null, // dev only; real specs must pin a checksum
+    sizeBytes = 491_400_032,
+)
 
 class MainActivity : Activity() {
 
-    private var handle = 0L
-    @Volatile private var generating = false
+    private val scope = MainScope()
+    private lateinit var edgeLlm: EdgeLlm
+    private var session: EdgeLlmSession? = null
+    private var generation: Job? = null
 
     private lateinit var status: TextView
     private lateinit var output: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        edgeLlm = EdgeLlm.create(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 64, 32, 32)
+            // Android 15 lays content out edge-to-edge; pad past the system bars.
+            setOnApplyWindowInsetsListener { v, insets ->
+                val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+                v.setPadding(32, bars.top + 32, 32, bars.bottom + 32)
+                insets
+            }
         }
 
-        status = TextView(this).apply { text = "Model not loaded" }
+        val deviceInfo = TextView(this)
+        status = TextView(this)
         val promptInput = EditText(this).apply {
             hint = "Prompt"
             setText("Why is the sky blue? Answer briefly.")
@@ -40,6 +61,7 @@ class MainActivity : Activity() {
         output = TextView(this).apply { textSize = 14f }
         val scroll = ScrollView(this).apply { addView(output) }
 
+        root.addView(deviceInfo)
         root.addView(status)
         root.addView(promptInput)
         root.addView(loadBtn)
@@ -48,70 +70,75 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         setContentView(root)
 
-        val modelFile = File(getExternalFilesDir(null), "model.gguf")
+        val profile = edgeLlm.deviceProfile()
+        val fit = edgeLlm.checkFit(QWEN_05B)
+        deviceInfo.text =
+            "SoC: ${profile.socModel}, ${profile.availableRamMb}MB free — fit: ${fit.label()}"
+        status.text = "Model not loaded"
 
         loadBtn.setOnClickListener {
-            if (!modelFile.exists()) {
-                status.text = "Missing model: ${modelFile.absolutePath}"
+            if (!edgeLlm.isDownloaded(QWEN_05B)) {
+                status.text = "Model missing at ${edgeLlm.modelFile(QWEN_05B)}"
                 return@setOnClickListener
             }
             status.text = "Loading…"
             loadBtn.isEnabled = false
-            thread {
-                val h = LlamaBridge.nativeLoadModel(modelFile.absolutePath, 2048)
-                runOnUiThread {
-                    if (h == 0L) {
-                        status.text = "Load failed (see logcat, tag: edgellm)"
-                        loadBtn.isEnabled = true
-                    } else {
-                        handle = h
+            scope.launch {
+                runCatching { edgeLlm.load(QWEN_05B) }
+                    .onSuccess {
+                        session = it
                         status.text = "Model loaded"
                         genBtn.isEnabled = true
                     }
-                }
+                    .onFailure {
+                        status.text = "Load failed: ${it.message}"
+                        loadBtn.isEnabled = true
+                    }
             }
         }
 
         genBtn.setOnClickListener {
-            // Qwen2.5 chat template, hardcoded for the spike.
-            // The real SDK will read the template from GGUF metadata.
+            val s = session ?: return@setOnClickListener
+            // Qwen2.5 chat template, hardcoded until core reads GGUF metadata.
             val prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n" +
                 "<|im_start|>user\n${promptInput.text}<|im_end|>\n<|im_start|>assistant\n"
 
             output.text = ""
             genBtn.isEnabled = false
             stopBtn.isEnabled = true
-            generating = true
 
-            thread {
-                val bytes = ByteArrayOutputStream()
-                val startMs = System.currentTimeMillis()
-                val n = LlamaBridge.nativeGenerate(handle, prompt, 256) { piece ->
-                    bytes.write(piece)
-                    val text = bytes.toString("UTF-8")
-                    runOnUiThread { output.text = text }
-                }
-                val secs = (System.currentTimeMillis() - startMs) / 1000.0
-                runOnUiThread {
-                    status.text = if (n >= 0) {
-                        "Done: %d tokens in %.1fs (%.1f tok/s)".format(n, secs, n / secs)
-                    } else {
-                        "Generation failed: error $n"
+            generation = scope.launch {
+                runCatching {
+                    s.generate(prompt, maxTokens = 256).collect { event ->
+                        when (event) {
+                            is GenerationEvent.Token ->
+                                output.append(event.text)
+                            is GenerationEvent.Done ->
+                                status.text = "Done: %d tokens (%.1f tok/s)"
+                                    .format(event.totalTokens, event.tokensPerSec)
+                        }
                     }
-                    genBtn.isEnabled = true
-                    stopBtn.isEnabled = false
-                    generating = false
-                }
+                }.onFailure { status.text = "Generation failed: ${it.message}" }
+                genBtn.isEnabled = true
+                stopBtn.isEnabled = false
             }
         }
 
         stopBtn.setOnClickListener {
-            if (generating) LlamaBridge.nativeStop(handle)
+            generation?.cancel()
+            status.text = "Stopped"
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (handle != 0L) LlamaBridge.nativeFree(handle)
+        scope.launch { session?.close() }
+        scope.cancel()
     }
+}
+
+private fun Fit.label(): String = when (this) {
+    is Fit.Ok -> "OK"
+    is Fit.TightRam -> "tight (${availableMb}MB free / ${requiredMb}MB needed)"
+    is Fit.WontFit -> "won't fit (${availableMb}MB free / ${requiredMb}MB needed)"
 }

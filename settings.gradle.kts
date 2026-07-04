@@ -15,5 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "edgellm"
+include(":edgellm-core")
 include(":edgellm-engine-llamacpp")
 include(":sample")
