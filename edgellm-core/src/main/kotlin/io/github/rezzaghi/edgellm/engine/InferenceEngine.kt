@@ -1,7 +1,7 @@
-package io.github.lucas.edgellm.engine
+package io.github.rezzaghi.edgellm.engine
 
-import io.github.lucas.edgellm.GenerationEvent
-import io.github.lucas.edgellm.ModelFormat
+import io.github.rezzaghi.edgellm.GenerationEvent
+import io.github.rezzaghi.edgellm.ModelFormat
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -34,7 +34,7 @@ interface EngineSession {
      * Formats [messages] with the model's own chat template (e.g. from GGUF
      * metadata), ready to pass to [generate]. Null if the model has none.
      */
-    suspend fun applyChatTemplate(messages: List<io.github.lucas.edgellm.ChatMessage>): String?
+    suspend fun applyChatTemplate(messages: List<io.github.rezzaghi.edgellm.ChatMessage>): String?
 
     /** Token count of [text] under this model's tokenizer. */
     suspend fun tokenCount(text: String): Int

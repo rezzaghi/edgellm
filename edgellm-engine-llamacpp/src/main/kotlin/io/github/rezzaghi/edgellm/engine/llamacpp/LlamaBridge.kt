@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm.engine.llamacpp
+package io.github.rezzaghi.edgellm.engine.llamacpp
 
 /**
  * Thin JNI bridge over llama.cpp — spike version.

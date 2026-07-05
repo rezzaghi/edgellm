@@ -1,7 +1,7 @@
-package io.github.lucas.edgellm.internal
+package io.github.rezzaghi.edgellm.internal
 
-import io.github.lucas.edgellm.ModelFormat
-import io.github.lucas.edgellm.engine.InferenceEngine
+import io.github.rezzaghi.edgellm.ModelFormat
+import io.github.rezzaghi.edgellm.engine.InferenceEngine
 import java.util.ServiceLoader
 
 internal object EngineRegistry {

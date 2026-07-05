@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm
+package io.github.rezzaghi.edgellm
 
 /** Streamed events during generation. */
 sealed interface GenerationEvent {

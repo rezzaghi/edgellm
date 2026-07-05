@@ -1,15 +1,16 @@
-package io.github.lucas.edgellm
+package io.github.rezzaghi.edgellm
 
 import android.content.Context
-import io.github.lucas.edgellm.engine.DeviceProfile
-import io.github.lucas.edgellm.engine.EngineConfig
-import io.github.lucas.edgellm.engine.EngineSession
-import io.github.lucas.edgellm.engine.GenerationRequest
-import io.github.lucas.edgellm.engine.ModelFile
-import io.github.lucas.edgellm.internal.DeviceProfiler
-import io.github.lucas.edgellm.internal.Downloader
-import io.github.lucas.edgellm.internal.EngineRegistry
-import io.github.lucas.edgellm.internal.FitChecker
+import io.github.rezzaghi.edgellm.engine.DeviceProfile
+import io.github.rezzaghi.edgellm.engine.EngineConfig
+import io.github.rezzaghi.edgellm.engine.EngineSession
+import io.github.rezzaghi.edgellm.engine.GenerationRequest
+import io.github.rezzaghi.edgellm.engine.ModelFile
+import io.github.rezzaghi.edgellm.internal.DeviceProfiler
+import io.github.rezzaghi.edgellm.internal.Downloader
+import io.github.rezzaghi.edgellm.internal.ModelCatalog
+import io.github.rezzaghi.edgellm.internal.EngineRegistry
+import io.github.rezzaghi.edgellm.internal.FitChecker
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -17,6 +18,12 @@ import kotlinx.coroutines.flow.flow
 
 /** Entry point of the SDK. Obtain via [EdgeLlm.create]. */
 class EdgeLlm private constructor(private val context: Context) {
+
+    /**
+     * The curated model catalog bundled with this SDK version: known-good
+     * models with verified checksums and sizes.
+     */
+    fun catalog(): List<ModelSpec> = ModelCatalog.load(context)
 
     /** Snapshot of this device's hardware profile (RAM is point-in-time). */
     fun deviceProfile(): DeviceProfile = DeviceProfiler.profile(context)

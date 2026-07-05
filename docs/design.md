@@ -9,12 +9,12 @@ The design principle: **the developer describes *what* they want; the SDK owns t
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.lucas.edgellm") version "0.1.0"   // Gradle plugin (packaging)
+    id("io.github.rezzaghi.edgellm") version "0.1.0"   // Gradle plugin (packaging)
 }
 
 dependencies {
-    implementation("io.github.lucas:edgellm-core:0.1.0")
-    runtimeOnly("io.github.lucas:edgellm-engine-llamacpp:0.1.0") // v1: one engine
+    implementation("io.github.rezzaghi:edgellm-core:0.1.0")
+    runtimeOnly("io.github.rezzaghi:edgellm-engine-llamacpp:0.1.0") // v1: one engine
     // later: edgellm-engine-litert, edgellm-engine-mlc — same API
 }
 ```

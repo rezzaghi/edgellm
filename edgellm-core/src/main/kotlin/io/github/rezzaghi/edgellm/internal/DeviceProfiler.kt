@@ -1,9 +1,9 @@
-package io.github.lucas.edgellm.internal
+package io.github.rezzaghi.edgellm.internal
 
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
-import io.github.lucas.edgellm.engine.DeviceProfile
+import io.github.rezzaghi.edgellm.engine.DeviceProfile
 
 internal object DeviceProfiler {
 

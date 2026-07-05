@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm
+package io.github.rezzaghi.edgellm
 
 /** Result of asking whether a model can run on this device right now. */
 sealed interface Fit {

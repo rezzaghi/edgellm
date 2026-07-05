@@ -32,7 +32,7 @@ Session *toSession(jlong h) { return reinterpret_cast<Session *>(h); }
 } // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
         JNIEnv *env, jobject /*thiz*/, jstring jpath, jint nCtx) {
     const char *path = env->GetStringUTFChars(jpath, nullptr);
 
@@ -71,7 +71,7 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jprompt,
         jint maxTokens, jfloat temperature, jobject callback) {
     auto *s = toSession(handle);
@@ -147,7 +147,7 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTemplate(
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTemplate(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jobjectArray roles,
         jobjectArray contents, jboolean addAssistant) {
     auto *s = toSession(handle);
@@ -194,7 +194,7 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTemplate
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jtext) {
     auto *s = toSession(handle);
     if (!s) return -1;
@@ -206,13 +206,13 @@ Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeStop(
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeStop(
         JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
     if (auto *s = toSession(handle)) s->stop = true;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_github_lucas_edgellm_engine_llamacpp_LlamaBridge_nativeFree(
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeFree(
         JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
     auto *s = toSession(handle);
     if (!s) return;

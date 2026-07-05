@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm
+package io.github.rezzaghi.edgellm
 
 /** One turn of a conversation. Roles follow the usual convention. */
 data class ChatMessage(val role: String, val content: String) {

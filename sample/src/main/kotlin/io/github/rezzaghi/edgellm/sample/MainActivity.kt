@@ -1,44 +1,47 @@
-package io.github.lucas.edgellm.sample
+package io.github.rezzaghi.edgellm.sample
 
 import android.app.Activity
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
-import io.github.lucas.edgellm.ChatMessage
-import io.github.lucas.edgellm.EdgeLlm
-import io.github.lucas.edgellm.EdgeLlmSession
-import io.github.lucas.edgellm.Fit
-import io.github.lucas.edgellm.GenerationEvent
-import io.github.lucas.edgellm.ModelSpec
+import io.github.rezzaghi.edgellm.ChatMessage
+import io.github.rezzaghi.edgellm.EdgeLlm
+import io.github.rezzaghi.edgellm.EdgeLlmSession
+import io.github.rezzaghi.edgellm.Fit
+import io.github.rezzaghi.edgellm.GenerationEvent
+import io.github.rezzaghi.edgellm.ModelSpec
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
-private val QWEN_05B = ModelSpec(
-    id = "qwen2.5-0.5b-instruct-q4km",
-    url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-    sha256 = "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
-    sizeBytes = 491_400_032,
-)
-
 class MainActivity : Activity() {
 
     private val scope = MainScope()
     private lateinit var edgeLlm: EdgeLlm
+    private lateinit var model: ModelSpec
     private var session: EdgeLlmSession? = null
     private var generation: Job? = null
 
+    private lateinit var deviceInfo: TextView
     private lateinit var status: TextView
     private lateinit var output: TextView
+    private lateinit var loadBtn: Button
+    private lateinit var genBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         edgeLlm = EdgeLlm.create(this)
+        val catalog = edgeLlm.catalog()
+        model = catalog.first()
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -50,21 +53,29 @@ class MainActivity : Activity() {
             }
         }
 
-        val deviceInfo = TextView(this)
+        deviceInfo = TextView(this)
         status = TextView(this)
+        val modelPicker = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                catalog.map { it.id },
+            )
+        }
         val promptInput = EditText(this).apply {
             hint = "Prompt"
             setText("Why is the sky blue? Answer briefly.")
         }
         val downloadBtn = Button(this).apply { text = "Download model" }
-        val loadBtn = Button(this).apply { text = "Load model" }
-        val genBtn = Button(this).apply { text = "Generate"; isEnabled = false }
+        loadBtn = Button(this).apply { text = "Load model" }
+        genBtn = Button(this).apply { text = "Generate"; isEnabled = false }
         val stopBtn = Button(this).apply { text = "Stop"; isEnabled = false }
         output = TextView(this).apply { textSize = 14f }
         val scroll = ScrollView(this).apply { addView(output) }
 
         root.addView(deviceInfo)
         root.addView(status)
+        root.addView(modelPicker)
         root.addView(promptInput)
         root.addView(downloadBtn)
         root.addView(loadBtn)
@@ -73,17 +84,21 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         setContentView(root)
 
-        val profile = edgeLlm.deviceProfile()
-        val fit = edgeLlm.checkFit(QWEN_05B)
-        deviceInfo.text =
-            "SoC: ${profile.socModel}, ${profile.availableRamMb}MB free — fit: ${fit.label()}"
-        status.text = "Model not loaded"
+        modelPicker.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                selectModel(catalog[pos])
+            }
+
+            override fun onNothingSelected(p: AdapterView<*>?) = Unit
+        }
+        selectModel(model)
 
         downloadBtn.setOnClickListener {
+            val m = model
             downloadBtn.isEnabled = false
             scope.launch {
                 runCatching {
-                    edgeLlm.download(QWEN_05B).collect { p ->
+                    edgeLlm.download(m).collect { p ->
                         status.text = "Downloading: %.1f%% (%d / %d MB)".format(
                             p.fraction * 100, p.bytesDownloaded / MB, p.totalBytes / MB,
                         )
@@ -96,17 +111,18 @@ class MainActivity : Activity() {
         }
 
         loadBtn.setOnClickListener {
-            if (!edgeLlm.isDownloaded(QWEN_05B)) {
+            val m = model
+            if (!edgeLlm.isDownloaded(m)) {
                 status.text = "Model not downloaded yet — tap Download model"
                 return@setOnClickListener
             }
             status.text = "Loading…"
             loadBtn.isEnabled = false
             scope.launch {
-                runCatching { edgeLlm.load(QWEN_05B) }
+                runCatching { edgeLlm.load(m) }
                     .onSuccess {
                         session = it
-                        status.text = "Model loaded"
+                        status.text = "Model loaded: ${m.id}"
                         genBtn.isEnabled = true
                     }
                     .onFailure {
@@ -147,6 +163,29 @@ class MainActivity : Activity() {
         stopBtn.setOnClickListener {
             generation?.cancel()
             status.text = "Stopped"
+        }
+    }
+
+    /** Switching models invalidates the loaded session and refreshes the UI. */
+    private fun selectModel(m: ModelSpec) {
+        model = m
+        generation?.cancel()
+        val old = session
+        session = null
+        if (old != null) scope.launch { old.close() }
+
+        genBtn.isEnabled = false
+        loadBtn.isEnabled = true
+        output.text = ""
+
+        val profile = edgeLlm.deviceProfile()
+        val fit = edgeLlm.checkFit(m)
+        deviceInfo.text =
+            "SoC: ${profile.socModel}, ${profile.availableRamMb}MB free — fit: ${fit.label()}"
+        status.text = if (edgeLlm.isDownloaded(m)) {
+            "Downloaded, not loaded"
+        } else {
+            "Not downloaded (${m.sizeBytes / MB}MB)"
         }
     }
 

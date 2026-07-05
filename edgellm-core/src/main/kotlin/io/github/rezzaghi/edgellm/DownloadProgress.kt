@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm
+package io.github.rezzaghi.edgellm
 
 data class DownloadProgress(
     val bytesDownloaded: Long,

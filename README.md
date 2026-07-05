@@ -22,8 +22,8 @@ git clone --recursive <repo>
 ```
 
 The sample expects a GGUF model at
-`/sdcard/Android/data/io.github.lucas.edgellm.sample/files/model.gguf`
-(push one with `adb push model.gguf /sdcard/Android/data/io.github.lucas.edgellm.sample/files/`).
+`/sdcard/Android/data/io.github.rezzaghi.edgellm.sample/files/model.gguf`
+(push one with `adb push model.gguf /sdcard/Android/data/io.github.rezzaghi.edgellm.sample/files/`).
 
 ## Stability
 

@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm.engine.llamacpp
+package io.github.rezzaghi.edgellm.engine.llamacpp
 
 /**
  * Decodes a stream of UTF-8 byte chunks whose boundaries may fall inside a

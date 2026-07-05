@@ -1,6 +1,6 @@
-package io.github.lucas.edgellm.internal
+package io.github.rezzaghi.edgellm.internal
 
-import io.github.lucas.edgellm.DownloadProgress
+import io.github.rezzaghi.edgellm.DownloadProgress
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -12,6 +12,11 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 
 internal object Downloader {
+
+    private const val MB = 1024L * 1024L
+
+    /** Never fill the disk to the last byte; Android misbehaves near-full. */
+    private const val DISK_MARGIN_BYTES = 500L * MB
 
     /**
      * Downloads [url] to [dest] with resume support. Bytes stream into
@@ -35,6 +40,17 @@ internal object Downloader {
         if (have > expectedSize) {
             part.delete()
             have = 0
+        }
+
+        // Fail fast if the remaining bytes won't fit on disk, keeping a margin
+        // so the download can't be the thing that fills the phone completely.
+        val neededBytes = expectedSize - have + DISK_MARGIN_BYTES
+        val usableBytes = (dest.parentFile ?: dest).usableSpace
+        if (usableBytes < neededBytes) {
+            error(
+                "Not enough storage: needs ${neededBytes / MB}MB free, " +
+                    "only ${usableBytes / MB}MB available"
+            )
         }
 
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {

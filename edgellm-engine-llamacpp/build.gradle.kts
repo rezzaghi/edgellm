@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.lucas.edgellm.engine.llamacpp"
+    namespace = "io.github.rezzaghi.edgellm.engine.llamacpp"
     compileSdk = 35
 
     defaultConfig {

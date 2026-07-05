@@ -1,4 +1,4 @@
-package io.github.lucas.edgellm
+package io.github.rezzaghi.edgellm
 
 /**
  * Declares a model the app wants to use. In a later milestone the Gradle

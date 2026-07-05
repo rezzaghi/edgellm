@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.lucas.edgellm"
+    namespace = "io.github.rezzaghi.edgellm"
     compileSdk = 35
 
     defaultConfig {

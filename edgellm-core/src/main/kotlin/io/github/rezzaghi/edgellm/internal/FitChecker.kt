@@ -1,8 +1,8 @@
-package io.github.lucas.edgellm.internal
+package io.github.rezzaghi.edgellm.internal
 
-import io.github.lucas.edgellm.Fit
-import io.github.lucas.edgellm.ModelSpec
-import io.github.lucas.edgellm.engine.DeviceProfile
+import io.github.rezzaghi.edgellm.Fit
+import io.github.rezzaghi.edgellm.ModelSpec
+import io.github.rezzaghi.edgellm.engine.DeviceProfile
 
 internal object FitChecker {
 

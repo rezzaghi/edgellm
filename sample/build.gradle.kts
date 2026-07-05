@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.lucas.edgellm.sample"
+    namespace = "io.github.rezzaghi.edgellm.sample"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.lucas.edgellm.sample"
+        applicationId = "io.github.rezzaghi.edgellm.sample"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
