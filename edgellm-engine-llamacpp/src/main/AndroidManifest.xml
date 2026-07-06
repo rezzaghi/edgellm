@@ -1,2 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Android 12+ blocks loading vendor libraries unless declared.
+             The device's real OpenCL driver is a vendor lib; without this,
+             the ICD loader finds no GPU. required=false keeps the SDK
+             installable on devices without OpenCL (CPU fallback). -->
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+    </application>
+
+</manifest>

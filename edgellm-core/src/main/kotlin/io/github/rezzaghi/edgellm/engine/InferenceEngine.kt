@@ -51,6 +51,11 @@ data class EngineConfig(
     val contextLength: Int = 2048,
     /** 0 = let the engine pick. */
     val threads: Int = 0,
+    /**
+     * Model layers to offload to the GPU; 0 = CPU only. Temporary manual
+     * knob until Backend.Auto routing lands.
+     */
+    val gpuLayers: Int = 0,
 )
 
 data class GenerationRequest(

@@ -1,0 +1,6 @@
+# Host toolchain for ggml's vulkan-shaders-gen when cross-compiling to
+# Android from Windows. Uses MSVC (requires a VS developer environment /
+# vcvars64) and the Android SDK's bundled ninja.
+set(CMAKE_C_COMPILER cl)
+set(CMAKE_CXX_COMPILER cl)
+set(CMAKE_MAKE_PROGRAM "@EDGELLM_HOST_NINJA@" CACHE FILEPATH "" FORCE)

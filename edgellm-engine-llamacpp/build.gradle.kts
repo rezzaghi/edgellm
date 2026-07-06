@@ -6,9 +6,11 @@ plugins {
 android {
     namespace = "io.github.rezzaghi.edgellm.engine.llamacpp"
     compileSdk = 35
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        minSdk = 26
+        // 28+: the Android Vulkan loader gains the 1.1 symbols ggml needs
+        minSdk = 28
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -17,6 +19,9 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
+                // Inference is unusable at -O0; optimize native code even in
+                // debug variants (Kotlin/Java debugging is unaffected).
+                arguments += "-DCMAKE_BUILD_TYPE=Release"
             }
         }
     }
@@ -24,7 +29,6 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "4.1.2"
         }
     }
 

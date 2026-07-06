@@ -18,7 +18,7 @@ object LlamaBridge {
     }
 
     /** Returns a native session handle, or 0 on failure. */
-    external fun nativeLoadModel(path: String, nCtx: Int): Long
+    external fun nativeLoadModel(path: String, nCtx: Int, nGpuLayers: Int): Long
 
     /** Blocks until done. Returns tokens generated, or a negative error code. */
     external fun nativeGenerate(

@@ -34,7 +34,7 @@ class LlamaCppEngine : InferenceEngine {
 
     override suspend fun load(file: ModelFile, config: EngineConfig): EngineSession {
         val handle = withContext(Dispatchers.IO) {
-            LlamaBridge.nativeLoadModel(file.path, config.contextLength)
+            LlamaBridge.nativeLoadModel(file.path, config.contextLength, config.gpuLayers)
         }
         check(handle != 0L) { "llama.cpp failed to load ${file.path} (see logcat, tag: edgellm)" }
         return LlamaCppSession(handle)

@@ -31,43 +31,57 @@ Session *toSession(jlong h) { return reinterpret_cast<Session *>(h); }
 
 } // namespace
 
+// llama.cpp (and especially its Vulkan path) throws C++ exceptions; an
+// exception escaping a JNI function aborts the entire app process. Every
+// entry point below catches and degrades to an error return instead.
+
 extern "C" JNIEXPORT jlong JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
-        JNIEnv *env, jobject /*thiz*/, jstring jpath, jint nCtx) {
-    const char *path = env->GetStringUTFChars(jpath, nullptr);
+        JNIEnv *env, jobject /*thiz*/, jstring jpath, jint nCtx, jint nGpuLayers) {
+    const char *pathC = env->GetStringUTFChars(jpath, nullptr);
+    std::string path(pathC);
+    env->ReleaseStringUTFChars(jpath, pathC);
 
-    llama_backend_init();
+    try {
+        llama_backend_init();
 
-    llama_model_params mparams = llama_model_default_params();
-    mparams.n_gpu_layers = 0; // CPU only for the spike
+        llama_model_params mparams = llama_model_default_params();
+        mparams.n_gpu_layers = nGpuLayers; // 0 = CPU only; ggml picks Vulkan when > 0
 
-    llama_model *model = llama_model_load_from_file(path, mparams);
-    env->ReleaseStringUTFChars(jpath, path);
-    if (!model) {
-        LOGE("failed to load model");
+        llama_model *model = llama_model_load_from_file(path.c_str(), mparams);
+        if (!model) {
+            LOGE("failed to load model");
+            return 0;
+        }
+
+        llama_context_params cparams = llama_context_default_params();
+        cparams.n_ctx = nCtx;
+        cparams.n_batch = nCtx; // whole prompt in one decode call
+        const int threads = (int) std::max(4u, std::thread::hardware_concurrency() / 2);
+        cparams.n_threads = threads;
+        cparams.n_threads_batch = threads;
+
+        llama_context *ctx = llama_init_from_model(model, cparams);
+        if (!ctx) {
+            LOGE("failed to create context");
+            llama_model_free(model);
+            return 0;
+        }
+
+        auto *s = new Session();
+        s->model = model;
+        s->ctx = ctx;
+        s->vocab = llama_model_get_vocab(model);
+        LOGI("model loaded: n_ctx=%d threads=%d gpu_layers=%d",
+             (int) nCtx, threads, (int) nGpuLayers);
+        return reinterpret_cast<jlong>(s);
+    } catch (const std::exception &e) {
+        LOGE("load failed with native exception: %s", e.what());
+        return 0;
+    } catch (...) {
+        LOGE("load failed with unknown native exception");
         return 0;
     }
-
-    llama_context_params cparams = llama_context_default_params();
-    cparams.n_ctx = nCtx;
-    cparams.n_batch = nCtx; // whole prompt in one decode call
-    const int threads = (int) std::max(4u, std::thread::hardware_concurrency() / 2);
-    cparams.n_threads = threads;
-    cparams.n_threads_batch = threads;
-
-    llama_context *ctx = llama_init_from_model(model, cparams);
-    if (!ctx) {
-        LOGE("failed to create context");
-        llama_model_free(model);
-        return 0;
-    }
-
-    auto *s = new Session();
-    s->model = model;
-    s->ctx = ctx;
-    s->vocab = llama_model_get_vocab(model);
-    LOGI("model loaded: n_ctx=%d threads=%d", (int) nCtx, threads);
-    return reinterpret_cast<jlong>(s);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -86,6 +100,7 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
     std::string prompt(promptC);
     env->ReleaseStringUTFChars(jprompt, promptC);
 
+    try {
     // Fresh conversation per call: drop previous KV state.
     llama_memory_clear(llama_get_memory(s->ctx), true);
 
@@ -144,6 +159,13 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
 
     llama_sampler_free(smpl);
     return generated;
+    } catch (const std::exception &e) {
+        LOGE("generation failed with native exception: %s", e.what());
+        return -5;
+    } catch (...) {
+        LOGE("generation failed with unknown native exception");
+        return -5;
+    }
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
@@ -153,6 +175,7 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTempl
     auto *s = toSession(handle);
     if (!s) return nullptr;
 
+    try {
     const char *tmpl = llama_model_chat_template(s->model, /*name=*/nullptr);
     if (!tmpl) return nullptr;
 
@@ -191,6 +214,13 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTempl
     jbyteArray out = env->NewByteArray(len);
     env->SetByteArrayRegion(out, 0, len, (jbyte *) buf.data());
     return out;
+    } catch (const std::exception &e) {
+        LOGE("chat template failed with native exception: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        LOGE("chat template failed with unknown native exception");
+        return nullptr;
+    }
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -199,8 +229,13 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
     auto *s = toSession(handle);
     if (!s) return -1;
     const char *text = env->GetStringUTFChars(jtext, nullptr);
-    const int n = -llama_tokenize(s->vocab, text, (int) strlen(text),
-                                  nullptr, 0, true, true);
+    int n = -1;
+    try {
+        n = -llama_tokenize(s->vocab, text, (int) strlen(text),
+                            nullptr, 0, true, true);
+    } catch (...) {
+        LOGE("tokenCount failed with native exception");
+    }
     env->ReleaseStringUTFChars(jtext, text);
     return n;
 }
@@ -216,7 +251,11 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeFree(
         JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
     auto *s = toSession(handle);
     if (!s) return;
-    if (s->ctx) llama_free(s->ctx);
-    if (s->model) llama_model_free(s->model);
+    try {
+        if (s->ctx) llama_free(s->ctx);
+        if (s->model) llama_model_free(s->model);
+    } catch (...) {
+        LOGE("free failed with native exception; leaking session");
+    }
     delete s;
 }

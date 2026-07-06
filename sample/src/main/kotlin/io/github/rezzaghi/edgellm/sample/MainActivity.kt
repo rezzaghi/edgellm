@@ -7,6 +7,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -18,6 +19,7 @@ import io.github.rezzaghi.edgellm.EdgeLlmSession
 import io.github.rezzaghi.edgellm.Fit
 import io.github.rezzaghi.edgellm.GenerationEvent
 import io.github.rezzaghi.edgellm.ModelSpec
+import io.github.rezzaghi.edgellm.engine.EngineConfig
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -67,6 +69,7 @@ class MainActivity : Activity() {
             setText("Why is the sky blue? Answer briefly.")
         }
         val downloadBtn = Button(this).apply { text = "Download model" }
+        val gpuToggle = CheckBox(this).apply { text = "Use GPU (OpenCL)" }
         loadBtn = Button(this).apply { text = "Load model" }
         genBtn = Button(this).apply { text = "Generate"; isEnabled = false }
         val stopBtn = Button(this).apply { text = "Stop"; isEnabled = false }
@@ -78,6 +81,7 @@ class MainActivity : Activity() {
         root.addView(modelPicker)
         root.addView(promptInput)
         root.addView(downloadBtn)
+        root.addView(gpuToggle)
         root.addView(loadBtn)
         root.addView(genBtn)
         root.addView(stopBtn)
@@ -118,8 +122,9 @@ class MainActivity : Activity() {
             }
             status.text = "Loading…"
             loadBtn.isEnabled = false
+            val config = EngineConfig(gpuLayers = if (gpuToggle.isChecked) 99 else 0)
             scope.launch {
-                runCatching { edgeLlm.load(m) }
+                runCatching { edgeLlm.load(m, config) }
                     .onSuccess {
                         session = it
                         status.text = "Model loaded: ${m.id}"
