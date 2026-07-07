@@ -35,18 +35,17 @@ set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
 # GPU backend via OpenCL (Qualcomm's contributed backend, tuned for Adreno).
 set(GGML_OPENCL ON CACHE BOOL "" FORCE)
 
-# libOpenCL.so for Android: build Khronos' ICD loader from source; at runtime
-# it locates the device's real OpenCL driver. Ships inside the APK.
-set(OPENCL_ICD_LOADER_HEADERS_DIR ${THIRD_PARTY}/OpenCL-Headers CACHE PATH "" FORCE)
-set(OPENCL_ICD_LOADER_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-# Must be a shared lib (ships in the APK) even though llama.cpp is static.
-set(OPENCL_ICD_LOADER_BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
-add_subdirectory(${THIRD_PARTY}/OpenCL-ICD-Loader opencl-icd-build)
+# Android vendor CL drivers lack cl_khr_icd, so the Khronos ICD loader can't
+# see them; opencl_stub.cpp forwards the API to the vendor driver instead.
+add_library(opencl_stub STATIC opencl_stub.cpp)
+target_include_directories(opencl_stub PRIVATE ${THIRD_PARTY}/OpenCL-Headers)
+set_target_properties(opencl_stub PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/opencl-stub)
 
 # Pre-seed FindOpenCL so ggml-opencl's find_package(OpenCL) resolves to our
-# submodule headers + the ICD loader we just declared.
+# submodule headers + the stub.
 set(OpenCL_INCLUDE_DIR ${THIRD_PARTY}/OpenCL-Headers CACHE PATH "" FORCE)
-set(OpenCL_LIBRARY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libOpenCL.so CACHE FILEPATH "" FORCE)
+set(OpenCL_LIBRARY ${CMAKE_BINARY_DIR}/opencl-stub/libopencl_stub.a CACHE FILEPATH "" FORCE)
 
 # ggml compiles its vulkan-shaders-gen tool FOR THE HOST during the Android
 # build. On Windows that host build can't find ninja or a compiler on its
@@ -74,10 +73,8 @@ endif()
 
 add_subdirectory(${LLAMA_DIR} llama.cpp-build)
 
-# ggml-opencl links against the ICD loader's output file path; make sure the
-# loader is actually built first.
 if(TARGET ggml-opencl)
-    add_dependencies(ggml-opencl OpenCL)
+    add_dependencies(ggml-opencl opencl_stub)
 endif()
 
 add_library(edgellm_jni SHARED llama_jni.cpp)

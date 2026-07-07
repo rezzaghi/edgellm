@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -29,6 +30,18 @@ struct Session {
 
 Session *toSession(jlong h) { return reinterpret_cast<Session *>(h); }
 
+// llama.cpp logs to stderr, which Android discards; forward into logcat.
+void forwardLlamaLog(ggml_log_level level, const char *text, void * /*user*/) {
+    int prio;
+    switch (level) {
+        case GGML_LOG_LEVEL_ERROR: prio = ANDROID_LOG_ERROR; break;
+        case GGML_LOG_LEVEL_WARN:  prio = ANDROID_LOG_WARN;  break;
+        case GGML_LOG_LEVEL_DEBUG: prio = ANDROID_LOG_DEBUG; break;
+        default:                   prio = ANDROID_LOG_INFO;  break;
+    }
+    __android_log_write(prio, "llama.cpp", text);
+}
+
 } // namespace
 
 // llama.cpp (and especially its Vulkan path) throws C++ exceptions; an
@@ -43,6 +56,7 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
     env->ReleaseStringUTFChars(jpath, pathC);
 
     try {
+        llama_log_set(forwardLlamaLog, nullptr);
         llama_backend_init();
 
         llama_model_params mparams = llama_model_default_params();
