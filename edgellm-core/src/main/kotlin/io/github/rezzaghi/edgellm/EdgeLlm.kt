@@ -1,11 +1,13 @@
 package io.github.rezzaghi.edgellm
 
 import android.content.Context
+import io.github.rezzaghi.edgellm.engine.Backend
 import io.github.rezzaghi.edgellm.engine.DeviceProfile
 import io.github.rezzaghi.edgellm.engine.EngineConfig
 import io.github.rezzaghi.edgellm.engine.EngineSession
 import io.github.rezzaghi.edgellm.engine.GenerationRequest
 import io.github.rezzaghi.edgellm.engine.ModelFile
+import io.github.rezzaghi.edgellm.internal.BackendRouter
 import io.github.rezzaghi.edgellm.internal.DeviceProfiler
 import io.github.rezzaghi.edgellm.internal.Downloader
 import io.github.rezzaghi.edgellm.internal.ModelCatalog
@@ -59,7 +61,24 @@ class EdgeLlm private constructor(private val context: Context) {
                 "No engine supports ${model.format}. " +
                     "Add a runtimeOnly dependency on an edgellm-engine-* module."
             )
-        return EdgeLlmSession(engine.load(ModelFile(file.absolutePath, model.format), config))
+
+        val resolved = if (config.backend == Backend.AUTO) {
+            config.copy(backend = BackendRouter.route(deviceProfile()))
+        } else {
+            config
+        }
+
+        val modelFile = ModelFile(file.absolutePath, model.format)
+        val session = if (resolved.backend == Backend.CPU) {
+            engine.load(modelFile, resolved)
+        } else {
+            // A GPU backend that fails hard (driver crash, OOM on VRAM) must
+            // never surface to the app; retry on CPU instead.
+            runCatching { engine.load(modelFile, resolved) }
+                .getOrElse { engine.load(modelFile, resolved.copy(backend = Backend.CPU)) }
+        }
+
+        return EdgeLlmSession(session)
     }
 
     companion object {
@@ -69,6 +88,9 @@ class EdgeLlm private constructor(private val context: Context) {
 
 /** A loaded model, ready to generate. Close when done to free native memory. */
 class EdgeLlmSession internal constructor(private val engine: EngineSession) {
+
+    /** The backend actually serving this session, verified after load. */
+    val backend: Backend get() = engine.backend
 
     /**
      * Streams generation events. Cancelling collection stops generation.

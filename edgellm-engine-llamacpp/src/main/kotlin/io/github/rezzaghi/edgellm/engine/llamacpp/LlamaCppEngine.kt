@@ -29,19 +29,42 @@ class LlamaCppEngine : InferenceEngine {
 
     override val supportedFormats = setOf(ModelFormat.GGUF)
 
-    override fun capabilities(device: DeviceProfile) =
-        EngineCapabilities(backends = setOf(Backend.CPU)) // Vulkan later
+    override fun capabilities(device: DeviceProfile) = EngineCapabilities(
+        backends = if (LlamaBridge.nativeHasGpuBackend()) {
+            setOf(Backend.CPU, Backend.OPENCL)
+        } else {
+            setOf(Backend.CPU)
+        },
+    )
 
     override suspend fun load(file: ModelFile, config: EngineConfig): EngineSession {
+        val wantGpu = config.backend == Backend.OPENCL
         val handle = withContext(Dispatchers.IO) {
-            LlamaBridge.nativeLoadModel(file.path, config.contextLength, config.gpuLayers)
+            LlamaBridge.nativeLoadModel(
+                file.path, config.contextLength, if (wantGpu) ALL_LAYERS else 0,
+            )
         }
         check(handle != 0L) { "llama.cpp failed to load ${file.path} (see logcat, tag: edgellm)" }
-        return LlamaCppSession(handle)
+
+        // ggml silently keeps everything on CPU when no GPU device
+        // registered; report what actually happened, not what was asked.
+        val actual = if (wantGpu && LlamaBridge.nativeHasGpuBackend()) {
+            Backend.OPENCL
+        } else {
+            Backend.CPU
+        }
+        return LlamaCppSession(handle, actual)
+    }
+
+    private companion object {
+        const val ALL_LAYERS = 999
     }
 }
 
-private class LlamaCppSession(private val handle: Long) : EngineSession {
+private class LlamaCppSession(
+    private val handle: Long,
+    override val backend: Backend,
+) : EngineSession {
 
     private val generating = AtomicBoolean(false)
     private val closed = AtomicBoolean(false)

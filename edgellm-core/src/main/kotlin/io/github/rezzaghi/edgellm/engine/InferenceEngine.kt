@@ -28,6 +28,9 @@ interface InferenceEngine {
  * - cancelling the Flow's collection MUST stop native generation promptly
  */
 interface EngineSession {
+    /** The backend actually serving this session (verified, never AUTO). */
+    val backend: Backend
+
     fun generate(request: GenerationRequest): Flow<GenerationEvent>
 
     /**
@@ -52,10 +55,10 @@ data class EngineConfig(
     /** 0 = let the engine pick. */
     val threads: Int = 0,
     /**
-     * Model layers to offload to the GPU; 0 = CPU only. Temporary manual
-     * knob until Backend.Auto routing lands.
+     * AUTO lets the SDK route per device. Engines never receive AUTO —
+     * core resolves it to a concrete backend before load.
      */
-    val gpuLayers: Int = 0,
+    val backend: Backend = Backend.AUTO,
 )
 
 data class GenerationRequest(
@@ -69,11 +72,12 @@ data class EngineCapabilities(
     val backends: Set<Backend>,
 )
 
-enum class Backend { CPU, VULKAN, NPU }
+enum class Backend { AUTO, CPU, OPENCL, VULKAN, NPU }
 
 data class DeviceProfile(
     val totalRamMb: Long,
     val availableRamMb: Long,
     val socModel: String,
+    val socManufacturer: String,
     val abis: List<String>,
 )

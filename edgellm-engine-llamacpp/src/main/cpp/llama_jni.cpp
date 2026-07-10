@@ -13,6 +13,7 @@
 #include <thread>
 #include <vector>
 
+#include "ggml-backend.h"
 #include "llama.h"
 
 #define TAG "edgellm"
@@ -47,6 +48,18 @@ void forwardLlamaLog(ggml_log_level level, const char *text, void * /*user*/) {
 // llama.cpp (and especially its Vulkan path) throws C++ exceptions; an
 // exception escaping a JNI function aborts the entire app process. Every
 // entry point below catches and degrades to an error return instead.
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeHasGpuBackend(
+        JNIEnv * /*env*/, jobject /*thiz*/) {
+    try {
+        llama_log_set(forwardLlamaLog, nullptr);
+        llama_backend_init();
+        return ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU) != nullptr;
+    } catch (...) {
+        return false;
+    }
+}
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(

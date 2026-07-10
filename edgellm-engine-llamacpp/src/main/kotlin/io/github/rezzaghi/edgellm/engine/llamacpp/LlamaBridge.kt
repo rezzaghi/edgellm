@@ -17,6 +17,9 @@ object LlamaBridge {
         fun onToken(bytes: ByteArray)
     }
 
+    /** True if ggml registered a usable GPU device on this phone. */
+    external fun nativeHasGpuBackend(): Boolean
+
     /** Returns a native session handle, or 0 on failure. */
     external fun nativeLoadModel(path: String, nCtx: Int, nGpuLayers: Int): Long
 

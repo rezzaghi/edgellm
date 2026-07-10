@@ -12,16 +12,21 @@ internal object DeviceProfiler {
         val mem = ActivityManager.MemoryInfo()
         am.getMemoryInfo(mem)
 
-        val soc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Build.SOC_MODEL
+        val soc: String
+        val socMaker: String
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            soc = Build.SOC_MODEL
+            socMaker = Build.SOC_MANUFACTURER
         } else {
-            Build.HARDWARE
+            soc = Build.HARDWARE
+            socMaker = Build.HARDWARE
         }
 
         return DeviceProfile(
             totalRamMb = mem.totalMem / MB,
             availableRamMb = mem.availMem / MB,
             socModel = soc,
+            socManufacturer = socMaker,
             abis = Build.SUPPORTED_ABIS.toList(),
         )
     }
