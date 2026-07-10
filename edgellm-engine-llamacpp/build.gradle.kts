@@ -43,4 +43,6 @@ android {
 
 dependencies {
     implementation(project(":edgellm-core"))
+
+    testImplementation("junit:junit:4.13.2")
 }
