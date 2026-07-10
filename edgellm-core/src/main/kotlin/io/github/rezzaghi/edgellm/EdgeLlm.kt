@@ -10,7 +10,6 @@ import io.github.rezzaghi.edgellm.engine.ModelFile
 import io.github.rezzaghi.edgellm.internal.BackendRouter
 import io.github.rezzaghi.edgellm.internal.DeviceProfiler
 import io.github.rezzaghi.edgellm.internal.Downloader
-import io.github.rezzaghi.edgellm.internal.ModelCatalog
 import io.github.rezzaghi.edgellm.internal.EngineRegistry
 import io.github.rezzaghi.edgellm.internal.FitChecker
 import java.io.File
@@ -21,11 +20,8 @@ import kotlinx.coroutines.flow.flow
 /** Entry point of the SDK. Obtain via [EdgeLlm.create]. */
 class EdgeLlm private constructor(private val context: Context) {
 
-    /**
-     * The curated model catalog bundled with this SDK version: known-good
-     * models with verified checksums and sizes.
-     */
-    fun catalog(): List<ModelSpec> = ModelCatalog.load(context)
+    /** The curated model catalog bundled with this SDK version; see [Catalog]. */
+    fun catalog(): List<ModelSpec> = Catalog.all
 
     /** Snapshot of this device's hardware profile (RAM is point-in-time). */
     fun deviceProfile(): DeviceProfile = DeviceProfiler.profile(context)
