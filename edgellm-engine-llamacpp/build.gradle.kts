@@ -11,6 +11,7 @@ android {
     defaultConfig {
         // 28+: the Android Vulkan loader gains the 1.1 symbols ggml needs
         minSdk = 28
+        consumerProguardFiles("consumer-rules.pro")
 
         ndk {
             abiFilters += "arm64-v8a"

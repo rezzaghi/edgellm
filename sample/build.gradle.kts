@@ -15,6 +15,15 @@ android {
         versionName = "0.1.0"
     }
 
+    buildTypes {
+        release {
+            // Minified on purpose: proves the SDK's consumer R8 rules work.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
