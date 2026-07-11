@@ -1,7 +1,11 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("maven-publish")
 }
+
+group = "io.github.rezzaghi"
+version = findProperty("edgellm.version") as String? ?: "0.0.0-SNAPSHOT"
 
 android {
     namespace = "io.github.rezzaghi.edgellm.engine.llamacpp"
@@ -33,6 +37,12 @@ android {
         }
     }
 
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -46,4 +56,23 @@ dependencies {
     implementation(project(":edgellm-core"))
 
     testImplementation("junit:junit:4.13.2")
+}
+
+publishing {
+    publications {
+        register<MavenPublication>("release") {
+            artifactId = "edgellm-engine-llamacpp"
+            afterEvaluate { from(components["release"]) }
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/rezzaghi/edgellm")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
 }

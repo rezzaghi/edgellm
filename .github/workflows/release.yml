@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ['release/*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK packages
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" "cmake;3.22.1" > /dev/null
+
+      - name: Unit tests
+        run: ./gradlew :edgellm-core:testDebugUnitTest :edgellm-engine-llamacpp:testDebugUnitTest
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew publish "-Pedgellm.version=${GITHUB_REF_NAME#release/}"
