@@ -29,3 +29,8 @@ The sample expects a GGUF model at
 
 Nothing is stable yet. Once published: the app-facing API aims for
 compatibility; the engine SPI is explicitly unstable until 1.0.
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE). Third-party submodules under
+`third_party/` keep their own licenses; see [NOTICE](NOTICE).
