@@ -11,7 +11,9 @@ import io.github.rezzaghi.edgellm.engine.GenerationRequest
 import io.github.rezzaghi.edgellm.engine.InferenceEngine
 import io.github.rezzaghi.edgellm.engine.ModelFile
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
@@ -138,12 +140,22 @@ private class LlamaCppSession(
         LlamaBridge.nativeTokenCount(handle, text)
     }
 
-    override suspend fun close() {
+    override fun close() {
         if (closed.compareAndSet(false, true)) {
             LlamaBridge.nativeStop(handle)     // ask any in-flight generate to exit…
-            nativeLock.withLock {              // …WAIT until it actually has…
-                withContext(Dispatchers.IO) { LlamaBridge.nativeFree(handle) } // …then free
+            cleanupScope.launch {
+                nativeLock.withLock {          // …WAIT until it actually has…
+                    LlamaBridge.nativeFree(handle) // …then free
+                }
             }
         }
+    }
+
+    private companion object {
+        /**
+         * close() must work from dying scopes (e.g. ViewModel.onCleared), so
+         * the actual native free runs here, detached from the caller.
+         */
+        val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

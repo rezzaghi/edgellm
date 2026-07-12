@@ -42,7 +42,11 @@ interface EngineSession {
     /** Token count of [text] under this model's tokenizer. */
     suspend fun tokenCount(text: String): Int
 
-    suspend fun close()
+    /**
+     * Releases the session's native memory. Fire-and-forget: safe to call
+     * from anywhere, including ViewModel.onCleared. Idempotent.
+     */
+    fun close()
 }
 
 data class ModelFile(

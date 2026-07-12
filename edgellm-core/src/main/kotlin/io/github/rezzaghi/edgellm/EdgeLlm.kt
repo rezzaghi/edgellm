@@ -116,5 +116,6 @@ class EdgeLlmSession internal constructor(private val engine: EngineSession) {
 
     suspend fun tokenCount(text: String): Int = engine.tokenCount(text)
 
-    suspend fun close() = engine.close()
+    /** Frees the model's native memory. Safe from anywhere; idempotent. */
+    fun close() = engine.close()
 }

@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".SampleApp"
         android:label="EdgeLLM Sample"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
