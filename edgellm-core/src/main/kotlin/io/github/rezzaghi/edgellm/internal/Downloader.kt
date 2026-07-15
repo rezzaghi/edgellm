@@ -73,10 +73,10 @@ internal object Downloader {
                 FileOutputStream(part, /*append=*/have > 0).use { output ->
                     val buf = ByteArray(256 * 1024)
                     while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        output.write(buf, 0, n)
-                        have += n
+                        val bytesRead = input.read(buf)
+                        if (bytesRead < 0) break
+                        output.write(buf, 0, bytesRead)
+                        have += bytesRead
                         emit(DownloadProgress(have, expectedSize))
                     }
                 }
@@ -104,9 +104,9 @@ internal object Downloader {
         file.inputStream().use { input ->
             val buf = ByteArray(1024 * 1024)
             while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                digest.update(buf, 0, n)
+                val bytesRead = input.read(buf)
+                if (bytesRead < 0) break
+                digest.update(buf, 0, bytesRead)
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }

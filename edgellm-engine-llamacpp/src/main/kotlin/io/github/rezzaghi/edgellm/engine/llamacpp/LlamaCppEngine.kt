@@ -91,7 +91,7 @@ private class LlamaCppSession(
                 val decoder = Utf8StreamDecoder()
                 val startMs = System.currentTimeMillis()
 
-                val n = nativeLock.withLock {
+                val tokenCount = nativeLock.withLock {
                     LlamaBridge.nativeGenerate(
                         handle, request.prompt, request.maxTokens, request.temperature,
                     ) { piece ->
@@ -103,11 +103,13 @@ private class LlamaCppSession(
                 val tail = decoder.flush()
                 if (tail.isNotEmpty()) trySendBlocking(GenerationEvent.Token(tail))
 
-                if (n < 0) {
-                    close(IllegalStateException("llama.cpp generation failed: error $n"))
+                if (tokenCount < 0) {
+                    close(IllegalStateException("llama.cpp generation failed: error $tokenCount"))
                 } else {
                     val secs = (System.currentTimeMillis() - startMs) / 1000.0
-                    trySendBlocking(GenerationEvent.Done(n, if (secs > 0) n / secs else 0.0))
+                    trySendBlocking(
+                        GenerationEvent.Done(tokenCount, if (secs > 0) tokenCount / secs else 0.0),
+                    )
                     close()
                 }
             } finally {

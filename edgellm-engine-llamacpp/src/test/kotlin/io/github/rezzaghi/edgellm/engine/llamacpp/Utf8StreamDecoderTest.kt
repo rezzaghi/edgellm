@@ -27,9 +27,9 @@ class Utf8StreamDecoderTest {
     @Test
     fun fourByteCharSplitAtEveryPosition() {
         for (split in 1..3) {
-            val d = Utf8StreamDecoder()
-            assertEquals("", d.feed(fourByteSeq.copyOfRange(0, split)))
-            assertEquals(fourByteChar, d.feed(fourByteSeq.copyOfRange(split, 4)))
+            val freshDecoder = Utf8StreamDecoder()
+            assertEquals("", freshDecoder.feed(fourByteSeq.copyOfRange(0, split)))
+            assertEquals(fourByteChar, freshDecoder.feed(fourByteSeq.copyOfRange(split, 4)))
         }
     }
 

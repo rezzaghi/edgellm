@@ -69,13 +69,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             try {
-                llm.download(spec).collect { p ->
-                    _state.value = UiState.Downloading(p.fraction)
+                llm.download(spec).collect { progress ->
+                    _state.value = UiState.Downloading(progress.fraction)
                 }
                 _state.value = UiState.LoadingModel
-                val s = llm.load(spec)
-                session = s
-                _state.value = UiState.Ready(s.backend)
+                val newSession = llm.load(spec)
+                session = newSession
+                _state.value = UiState.Ready(newSession.backend)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -85,7 +85,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun send(text: String) {
-        val s = session ?: return
+        val activeSession = session ?: return
         if (_generating.value || text.isBlank()) return
 
         val history = _messages.value + ChatMessage.user(text)
@@ -95,7 +95,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         generation = viewModelScope.launch {
             var reply = ""
             try {
-                s.chat(history).collect { event ->
+                activeSession.chat(history).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {
                             reply += event.text

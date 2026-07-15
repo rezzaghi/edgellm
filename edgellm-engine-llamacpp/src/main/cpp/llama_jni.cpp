@@ -29,7 +29,7 @@ struct Session {
     std::atomic<bool> stop{false};
 };
 
-Session *toSession(jlong h) { return reinterpret_cast<Session *>(h); }
+Session *toSession(jlong handle) { return reinterpret_cast<Session *>(handle); }
 
 // llama.cpp logs to stderr, which Android discards; forward into logcat.
 void forwardLlamaLog(ggml_log_level level, const char *text, void * /*user*/) {
@@ -95,13 +95,13 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeLoadModel(
             return 0;
         }
 
-        auto *s = new Session();
-        s->model = model;
-        s->ctx = ctx;
-        s->vocab = llama_model_get_vocab(model);
+        auto *session = new Session();
+        session->model = model;
+        session->ctx = ctx;
+        session->vocab = llama_model_get_vocab(model);
         LOGI("model loaded: n_ctx=%d threads=%d gpu_layers=%d",
              (int) nCtx, threads, (int) nGpuLayers);
-        return reinterpret_cast<jlong>(s);
+        return reinterpret_cast<jlong>(session);
     } catch (const std::exception &e) {
         LOGE("load failed with native exception: %s", e.what());
         return 0;
@@ -115,9 +115,9 @@ extern "C" JNIEXPORT jint JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jprompt,
         jint maxTokens, jfloat temperature, jobject callback) {
-    auto *s = toSession(handle);
-    if (!s) return -1;
-    s->stop = false;
+    auto *session = toSession(handle);
+    if (!session) return -1;
+    session->stop = false;
 
     jclass cbClass = env->GetObjectClass(callback);
     jmethodID onToken = env->GetMethodID(cbClass, "onToken", "([B)V");
@@ -129,25 +129,25 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
 
     try {
     // Fresh conversation per call: drop previous KV state.
-    llama_memory_clear(llama_get_memory(s->ctx), true);
+    llama_memory_clear(llama_get_memory(session->ctx), true);
 
     // Two-pass tokenize: first call reports required size as a negative count.
-    int n = -llama_tokenize(s->vocab, prompt.c_str(), (int) prompt.size(),
-                            nullptr, 0, /*add_special=*/true, /*parse_special=*/true);
-    if (n <= 0) {
+    int promptTokens = -llama_tokenize(session->vocab, prompt.c_str(), (int) prompt.size(),
+                                       nullptr, 0, /*add_special=*/true, /*parse_special=*/true);
+    if (promptTokens <= 0) {
         LOGE("tokenize sizing failed");
         return -3;
     }
-    std::vector<llama_token> tokens(n);
-    if (llama_tokenize(s->vocab, prompt.c_str(), (int) prompt.size(),
-                       tokens.data(), n, true, true) < 0) {
+    std::vector<llama_token> tokens(promptTokens);
+    if (llama_tokenize(session->vocab, prompt.c_str(), (int) prompt.size(),
+                       tokens.data(), promptTokens, true, true) < 0) {
         LOGE("tokenize failed");
         return -3;
     }
-    LOGI("prompt: %d tokens", n);
+    LOGI("prompt: %d tokens", promptTokens);
 
     llama_batch batch = llama_batch_get_one(tokens.data(), (int) tokens.size());
-    if (llama_decode(s->ctx, batch) != 0) {
+    if (llama_decode(session->ctx, batch) != 0) {
         LOGE("prompt decode failed");
         return -4;
     }
@@ -162,11 +162,11 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
 
     int generated = 0;
     char piece[256];
-    while (generated < maxTokens && !s->stop) {
-        llama_token tok = llama_sampler_sample(smpl, s->ctx, -1);
-        if (llama_vocab_is_eog(s->vocab, tok)) break;
+    while (generated < maxTokens && !session->stop) {
+        llama_token tok = llama_sampler_sample(smpl, session->ctx, -1);
+        if (llama_vocab_is_eog(session->vocab, tok)) break;
 
-        const int len = llama_token_to_piece(s->vocab, tok, piece, sizeof(piece), 0, true);
+        const int len = llama_token_to_piece(session->vocab, tok, piece, sizeof(piece), 0, true);
         if (len > 0) {
             jbyteArray arr = env->NewByteArray(len);
             env->SetByteArrayRegion(arr, 0, len, reinterpret_cast<jbyte *>(piece));
@@ -178,7 +178,7 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeGenerate(
         ++generated;
 
         llama_batch next = llama_batch_get_one(&tok, 1);
-        if (llama_decode(s->ctx, next) != 0) {
+        if (llama_decode(session->ctx, next) != 0) {
             LOGE("decode failed at token %d", generated);
             break;
         }
@@ -199,17 +199,17 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTemplate(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jobjectArray roles,
         jobjectArray contents, jboolean addAssistant) {
-    auto *s = toSession(handle);
-    if (!s) return nullptr;
+    auto *session = toSession(handle);
+    if (!session) return nullptr;
 
     try {
-    const char *tmpl = llama_model_chat_template(s->model, /*name=*/nullptr);
+    const char *tmpl = llama_model_chat_template(session->model, /*name=*/nullptr);
     if (!tmpl) return nullptr;
 
-    const jsize n = env->GetArrayLength(roles);
-    std::vector<std::string> storage(2 * n); // keeps the bytes alive for the call
-    std::vector<llama_chat_message> msgs(n);
-    for (jsize i = 0; i < n; ++i) {
+    const jsize msgCount = env->GetArrayLength(roles);
+    std::vector<std::string> storage(2 * msgCount); // keeps the bytes alive for the call
+    std::vector<llama_chat_message> msgs(msgCount);
+    for (jsize i = 0; i < msgCount; ++i) {
         auto jrole = (jbyteArray) env->GetObjectArrayElement(roles, i);
         auto jcontent = (jbyteArray) env->GetObjectArrayElement(contents, i);
 
@@ -226,11 +226,11 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTempl
     }
 
     std::vector<char> buf(4096);
-    int32_t len = llama_chat_apply_template(tmpl, msgs.data(), n, addAssistant,
+    int32_t len = llama_chat_apply_template(tmpl, msgs.data(), msgCount, addAssistant,
                                             buf.data(), (int32_t) buf.size());
     if (len > (int32_t) buf.size()) { // buffer was too small; retry sized
         buf.resize(len);
-        len = llama_chat_apply_template(tmpl, msgs.data(), n, addAssistant,
+        len = llama_chat_apply_template(tmpl, msgs.data(), msgCount, addAssistant,
                                         buf.data(), (int32_t) buf.size());
     }
     if (len < 0) {
@@ -253,36 +253,36 @@ Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeApplyChatTempl
 extern "C" JNIEXPORT jint JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeTokenCount(
         JNIEnv *env, jobject /*thiz*/, jlong handle, jstring jtext) {
-    auto *s = toSession(handle);
-    if (!s) return -1;
+    auto *session = toSession(handle);
+    if (!session) return -1;
     const char *text = env->GetStringUTFChars(jtext, nullptr);
-    int n = -1;
+    int tokenCount = -1;
     try {
-        n = -llama_tokenize(s->vocab, text, (int) strlen(text),
-                            nullptr, 0, true, true);
+        tokenCount = -llama_tokenize(session->vocab, text, (int) strlen(text),
+                                     nullptr, 0, true, true);
     } catch (...) {
         LOGE("tokenCount failed with native exception");
     }
     env->ReleaseStringUTFChars(jtext, text);
-    return n;
+    return tokenCount;
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeStop(
         JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
-    if (auto *s = toSession(handle)) s->stop = true;
+    if (auto *session = toSession(handle)) session->stop = true;
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_rezzaghi_edgellm_engine_llamacpp_LlamaBridge_nativeFree(
         JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
-    auto *s = toSession(handle);
-    if (!s) return;
+    auto *session = toSession(handle);
+    if (!session) return;
     try {
-        if (s->ctx) llama_free(s->ctx);
-        if (s->model) llama_model_free(s->model);
+        if (session->ctx) llama_free(session->ctx);
+        if (session->model) llama_model_free(session->model);
     } catch (...) {
         LOGE("free failed with native exception; leaking session");
     }
-    delete s;
+    delete session;
 }

@@ -24,27 +24,27 @@ internal class Utf8StreamDecoder {
         return tail
     }
 
-    /** Index up to which [b] is safe to decode. */
-    private fun completeBoundary(b: ByteArray): Int {
-        if (b.isEmpty()) return 0
+    /** Index up to which [bytes] is safe to decode. */
+    private fun completeBoundary(bytes: ByteArray): Int {
+        if (bytes.isEmpty()) return 0
 
         // Walk back over trailing continuation bytes (10xxxxxx) to the lead byte.
-        var lead = b.size - 1
+        var lead = bytes.size - 1
         var steps = 0
-        while (lead >= 0 && steps < 3 && (b[lead].toInt() and 0xC0) == 0x80) {
+        while (lead >= 0 && steps < 3 && (bytes[lead].toInt() and 0xC0) == 0x80) {
             lead--
             steps++
         }
-        if (lead < 0) return b.size // continuations only; nothing sane to hold back
+        if (lead < 0) return bytes.size // continuations only; nothing sane to hold back
 
         val expected = when {
-            (b[lead].toInt() and 0x80) == 0 -> 1 // ASCII
-            (b[lead].toInt() and 0xF8) == 0xF0 -> 4
-            (b[lead].toInt() and 0xF0) == 0xE0 -> 3
-            (b[lead].toInt() and 0xE0) == 0xC0 -> 2
+            (bytes[lead].toInt() and 0x80) == 0 -> 1 // ASCII
+            (bytes[lead].toInt() and 0xF8) == 0xF0 -> 4
+            (bytes[lead].toInt() and 0xF0) == 0xE0 -> 3
+            (bytes[lead].toInt() and 0xE0) == 0xC0 -> 2
             else -> 1 // invalid lead; decode as-is
         }
-        val have = b.size - lead
-        return if (have < expected) lead else b.size
+        val have = bytes.size - lead
+        return if (have < expected) lead else bytes.size
     }
 }

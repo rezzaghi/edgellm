@@ -58,12 +58,12 @@ fun ChatScreen(vm: ChatViewModel) {
         ModelPicker(vm.models, vm.model, enabled = !generating, onSelect = vm::selectModel)
         Spacer(Modifier.height(12.dp))
 
-        when (val s = state) {
-            is UiState.NeedsDownload -> PrepareCard(vm.model, s, vm::prepare)
+        when (val uiState = state) {
+            is UiState.NeedsDownload -> PrepareCard(vm.model, uiState, vm::prepare)
             is UiState.Downloading -> {
-                Text("Downloading… ${(s.fraction * 100).toInt()}%")
+                Text("Downloading… ${(uiState.fraction * 100).toInt()}%")
                 LinearProgressIndicator(
-                    progress = { s.fraction },
+                    progress = { uiState.fraction },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
             }
@@ -72,14 +72,14 @@ fun ChatScreen(vm: ChatViewModel) {
                 Text("Loading model…")
             }
             is UiState.Error -> Column {
-                Text(s.message, color = MaterialTheme.colorScheme.error)
+                Text(uiState.message, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = vm::prepare) { Text("Retry") }
             }
             is UiState.Ready -> ChatArea(
                 messages = messages,
                 generating = generating,
-                backend = s.backend.name,
+                backend = uiState.backend.name,
                 onSend = vm::send,
                 onStop = vm::stop,
             )
