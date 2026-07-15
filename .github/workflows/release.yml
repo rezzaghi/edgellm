@@ -5,7 +5,7 @@ on:
     tags: ['release/*']
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -34,3 +34,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew publish "-Pedgellm.version=${GITHUB_REF_NAME#release/}"
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#release/}"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "EdgeLLM $VERSION" \
+            --notes-file ".github/release-notes/$VERSION.md"
