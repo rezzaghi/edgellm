@@ -3,8 +3,7 @@
 [![CI](https://github.com/rezzaghi/edgellm/actions/workflows/ci.yml/badge.svg)](https://github.com/rezzaghi/edgellm/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-Run local LLMs on Android with a clean Kotlin API. You describe *what* you
-want; the SDK owns the ops:
+Run local LLMs on Android with a clean Kotlin API.
 
 - **Model delivery** — resumable downloads with SHA-256 verification and a
   disk-space guard, from a curated catalog or any GGUF URL.
